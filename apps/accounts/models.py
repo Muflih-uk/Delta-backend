@@ -10,19 +10,52 @@ class User(AbstractUser):
         INTERN = "intern", "Intern"
         ADMIN = "admin", "Admin"
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    role = models.CharField(max_length=10, choices=Role.choices, default=Role.STUDENT)
-    phone = models.CharField(max_length=20, blank=True)
-    avatar_url = models.URLField(blank=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
+    supabase_uid = models.UUIDField(
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
+    role = models.CharField(
+        max_length=20,
+        choices=Role.choices,
+        default=Role.STUDENT,
+    )
+
+    phone = models.CharField(
+        max_length=20,
+        blank=True,
+    )
+
+    avatar_url = models.URLField(
+        blank=True,
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+    )
+
+    updated_at = models.DateTimeField(
+        auto_now=True,
+    )
 
     class Meta:
         db_table = "users"
-        indexes = [models.Index(fields=["role"])]
+
+        indexes = [
+            models.Index(fields=["role"]),
+            models.Index(fields=["username"]),
+            models.Index(fields=["email"]),
+        ]
 
     def __str__(self):
-        return f"{self.get_full_name() or self.username} ({self.role})"
+        return self.username
 
     @property
     def is_student(self):
