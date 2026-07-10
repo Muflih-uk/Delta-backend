@@ -50,7 +50,6 @@ class CourseMaterial(models.Model):
     type = models.CharField(max_length=10, choices=Type.choices)
     title = models.CharField(max_length=255)
     url = models.URLField()
-    order_index = models.PositiveIntegerField(default=0)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -61,8 +60,8 @@ class CourseMaterial(models.Model):
 
     class Meta:
         db_table = "course_materials"
-        ordering = ["course", "order_index"]
-        indexes = [models.Index(fields=["course", "order_index"])]
+        ordering = ["course"]
+        indexes = [models.Index(fields=["course"])]
 
     def __str__(self):
         return f"{self.course.title} — {self.title}"

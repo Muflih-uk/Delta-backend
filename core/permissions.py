@@ -1,5 +1,6 @@
-from accounts.models import User
 from rest_framework.permissions import SAFE_METHODS, BasePermission
+
+from apps.accounts.models import User
 
 
 class IsStudent(BasePermission):
@@ -37,6 +38,7 @@ class IsInternOrAdmin(BasePermission):
     message = "Only interns or admins can perform this action."
 
     def has_permission(self, request, view):
+        print("Hello")
         return request.user.is_authenticated and request.user.role in [
             User.Role.INTERN,
             User.Role.ADMIN,
