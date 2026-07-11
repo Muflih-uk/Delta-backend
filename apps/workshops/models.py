@@ -65,3 +65,40 @@ class GalleryImage(models.Model):
 
     def __str__(self):
         return self.title or f"Gallery image {self.id}"
+
+
+class WorkshopRegistration(models.Model):
+    class Status(models.TextChoices):
+        REGISTERED = "registered", "Registered"
+        ATTENDED = "attended", "Attended"
+        CANCELLED = "cancelled", "Cancelled"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+
+    workshop = models.ForeignKey(
+        Workshop,
+        on_delete=models.CASCADE,
+        related_name="registrations",
+    )
+
+    student = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="workshop_registrations",
+    )
+
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.REGISTERED,
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "workshop_registrations"
+        unique_together = ("workshop", "student")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.student} - {self.workshop}"

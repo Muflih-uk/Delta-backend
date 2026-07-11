@@ -3,11 +3,18 @@ from rest_framework import viewsets
 
 from core.permissions import IsInternOrAdmin
 
-from .models import InventoryItem, InventoryLog
+from .models import InventoryCategory, InventoryItem, InventoryLog
 from .serializers import (
+    InventoryCategorySerializer,
     InventoryItemSerializer,
     InventoryLogSerializer,
 )
+
+
+class InventoryCategoryViewSet(viewsets.ModelViewSet):
+    queryset = InventoryCategory.objects.all().order_by("name")
+    serializer_class = InventoryCategorySerializer
+    permission_classes = [IsInternOrAdmin]
 
 
 class InventoryItemViewSet(viewsets.ModelViewSet):

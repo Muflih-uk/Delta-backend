@@ -1,7 +1,18 @@
 from rest_framework import serializers
 
-from .models import InventoryItem, InventoryLog
+from .models import InventoryItem, InventoryLog, InventoryCategory
 
+
+class InventoryCategorySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = InventoryCategory
+        fields = [
+            "id",
+            "name",
+        ]
+        read_only_fields = [
+            "id",
+        ]
 
 class InventoryItemSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source="category.name", read_only=True)
