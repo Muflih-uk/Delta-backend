@@ -1,12 +1,9 @@
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
-from core.permissions import (
-    IsInternOrAdmin,
-    IsStudent,
-)
+from core.permissions import IsInternOrAdmin, IsStudent
 
 from .models import (
     GalleryImage,
@@ -26,7 +23,23 @@ class WorkshopViewSet(viewsets.ModelViewSet):
         "registrations",
     )
     serializer_class = WorkshopSerializer
-    permission_classes = [IsInternOrAdmin]
+
+    def get_permissions(self):
+        if self.action in ["list", "retrieve"]:
+            return [AllowAny()]
+
+        return [IsAuthenticated(), IsInternOrAdmin()]
+
+    def get_queryset(self):
+        user = self.request.user
+
+        if not user.is_authenticated:
+            return Workshop.objects.filter(is_published=True)
+
+        if getattr(user, "role", None) == user.Role.STUDENT:
+            return Workshop.objects.filter(is_published=True)
+
+        return Workshop.objects.all()
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
@@ -34,7 +47,7 @@ class WorkshopViewSet(viewsets.ModelViewSet):
     @action(
         detail=True,
         methods=["get"],
-        permission_classes=[IsInternOrAdmin],
+        permission_classes=[IsAuthenticated, IsInternOrAdmin],
     )
     def registrations(self, request, pk=None):
         workshop = self.get_object()
@@ -54,7 +67,7 @@ class WorkshopViewSet(viewsets.ModelViewSet):
 class GalleryImageViewSet(viewsets.ModelViewSet):
     queryset = GalleryImage.objects.select_related("workshop")
     serializer_class = GalleryImageSerializer
-    permission_classes = [IsInternOrAdmin]
+    permission_classes = [IsAuthenticated, IsInternOrAdmin]
 
     def perform_create(self, serializer):
         serializer.save(uploaded_by=self.request.user)
@@ -65,7 +78,6 @@ class StudentWorkshopRegistrationViewSet(viewsets.GenericViewSet):
     permission_classes = [IsStudent]
 
     def create(self, request):
-
         workshop_id = request.data.get("workshop")
 
         if not workshop_id:
@@ -90,9 +102,7 @@ class StudentWorkshopRegistrationViewSet(viewsets.GenericViewSet):
             student=request.user,
         ).exists():
             return Response(
-                {
-                    "error": "Already registered for this workshop."
-                },
+                {"error": "Already registered for this workshop."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -103,10 +113,7 @@ class StudentWorkshopRegistrationViewSet(viewsets.GenericViewSet):
 
         serializer = WorkshopRegistrationSerializer(registration)
 
-        return Response(
-            serializer.data,
-            status=status.HTTP_201_CREATED,
-        )
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def list(self, request):
         registrations = WorkshopRegistration.objects.filter(

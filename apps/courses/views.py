@@ -1,5 +1,5 @@
 from rest_framework import status, viewsets
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 
 from core.permissions import (
@@ -17,15 +17,13 @@ from .serializers import (
     CourseSerializer,
 )
 
-
 class CourseViewSet(viewsets.ModelViewSet):
     queryset = Course.objects.all()
-
     serializer_class = CourseSerializer
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
-            return [IsAuthenticated()]
+            return [AllowAny()]
 
         return [
             IsAuthenticated(),
@@ -34,6 +32,9 @@ class CourseViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+
+        if not user.is_authenticated:
+            return Course.objects.filter(is_published=True)
 
         if user.role == user.Role.STUDENT:
             return Course.objects.filter(is_published=True)
