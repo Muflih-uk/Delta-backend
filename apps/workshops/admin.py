@@ -27,7 +27,7 @@ class WorkshopAdmin(admin.ModelAdmin):
         "location",
         "is_published",
         "created_by",
-        "created_at",
+        "created_at",gmail
     )
     list_filter = (
         "status",
