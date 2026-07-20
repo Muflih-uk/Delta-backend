@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.db.models import Count, Q
 from rest_framework import status
 from rest_framework.parsers import MultiPartParser
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -13,6 +14,9 @@ from apps.accounts.serializers import (
     UserSerializer,
 )
 from apps.accounts.services import AccountService
+from apps.enrollments.models import Enrollment
+from apps.workshops.models import WorkshopRegistration
+from core.permissions import IsStudent
 from core.storage import StorageService
 from core.supabase import supabase
 
@@ -396,4 +400,154 @@ class UploadAvatarView(APIView):
                 "success": True,
                 "avatar_url": url,
             }
+        )
+
+
+class StudentDashboardView(APIView):
+    """
+    GET /api/accounts/dashboard/
+
+    Returns an aggregated dashboard summary for the authenticated student:
+      - profile info
+      - course enrollment counts (total + per-status breakdown)
+      - workshop registration counts (total + per-status breakdown)
+      - recent enrollments (last 5)
+      - recent workshop registrations (last 5)
+      - upcoming workshops the student is registered for
+    """
+
+    permission_classes = [IsAuthenticated, IsStudent]
+
+    def get(self, request):
+        user = request.user
+
+        # ── Course Enrollment Stats ───────────────────────────────────────────
+        enrollment_qs = Enrollment.objects.filter(student=user)
+
+        enrollment_counts = enrollment_qs.aggregate(
+            total=Count("id"),
+            active=Count("id", filter=Q(status=Enrollment.Status.ACTIVE)),
+            pending_payment=Count(
+                "id", filter=Q(status=Enrollment.Status.PENDING_PAYMENT)
+            ),
+            payment_verification=Count(
+                "id", filter=Q(status=Enrollment.Status.PAYMENT_VERIFICATION)
+            ),
+            pending_enrollment=Count(
+                "id", filter=Q(status=Enrollment.Status.PENDING_ENROLLMENT)
+            ),
+            rejected=Count("id", filter=Q(status=Enrollment.Status.REJECTED)),
+        )
+
+        # ── Workshop Registration Stats ───────────────────────────────────────
+        registration_qs = WorkshopRegistration.objects.filter(student=user)
+
+        registration_counts = registration_qs.aggregate(
+            total=Count("id"),
+            registered=Count(
+                "id", filter=Q(status=WorkshopRegistration.Status.REGISTERED)
+            ),
+            attended=Count(
+                "id", filter=Q(status=WorkshopRegistration.Status.ATTENDED)
+            ),
+            cancelled=Count(
+                "id", filter=Q(status=WorkshopRegistration.Status.CANCELLED)
+            ),
+        )
+
+        # ── Recent Activity ───────────────────────────────────────────────────
+        recent_enrollments = (
+            enrollment_qs.select_related("course")
+            .order_by("-created_at")[:5]
+            .values(
+                "id",
+                "course__id",
+                "course__title",
+                "course__thumbnail_url",
+                "course__level",
+                "status",
+                "purchased_at",
+                "created_at",
+            )
+        )
+
+        recent_workshop_registrations = (
+            registration_qs.select_related("workshop")
+            .order_by("-created_at")[:5]
+            .values(
+                "id",
+                "workshop__id",
+                "workshop__title",
+                "workshop__image_url",
+                "workshop__event_date",
+                "workshop__location",
+                "workshop__status",
+                "status",
+                "created_at",
+            )
+        )
+
+        # ── Upcoming registered workshops ─────────────────────────────────────
+        from django.utils import timezone
+
+        upcoming_workshops = (
+            registration_qs.select_related("workshop")
+            .filter(
+                workshop__event_date__gte=timezone.now(),
+                status=WorkshopRegistration.Status.REGISTERED,
+            )
+            .order_by("workshop__event_date")[:5]
+            .values(
+                "id",
+                "workshop__id",
+                "workshop__title",
+                "workshop__image_url",
+                "workshop__event_date",
+                "workshop__location",
+                "workshop__status",
+            )
+        )
+
+        return Response(
+            {
+                "success": True,
+                "profile": {
+                    "id": str(user.id),
+                    "username": user.username,
+                    "email": user.email,
+                    "first_name": user.first_name,
+                    "last_name": user.last_name,
+                    "full_name": user.get_full_name(),
+                    "phone": user.phone,
+                    "avatar_url": user.avatar_url,
+                    "role": user.role,
+                    "member_since": user.created_at,
+                },
+                "courses": {
+                    "total_enrolled": enrollment_counts["total"],
+                    "breakdown": {
+                        "active": enrollment_counts["active"],
+                        "pending_payment": enrollment_counts["pending_payment"],
+                        "payment_verification": enrollment_counts[
+                            "payment_verification"
+                        ],
+                        "pending_enrollment": enrollment_counts["pending_enrollment"],
+                        "rejected": enrollment_counts["rejected"],
+                    },
+                },
+                "workshops": {
+                    "total_registered": registration_counts["total"],
+                    "breakdown": {
+                        "registered": registration_counts["registered"],
+                        "attended": registration_counts["attended"],
+                        "cancelled": registration_counts["cancelled"],
+                    },
+                },
+                "recent_enrollments": list(recent_enrollments),
+                "recent_workshop_registrations": list(
+                    recent_workshop_registrations
+                ),
+                "upcoming_workshops": list(upcoming_workshops),
+            },
+            status=status.HTTP_200_OK,
         )

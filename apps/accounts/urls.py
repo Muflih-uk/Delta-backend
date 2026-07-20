@@ -9,6 +9,7 @@ from .views import (
     RefreshTokenView,
     RegisterView,
     ResetPasswordView,
+    StudentDashboardView,
     UpdateProfileView,
     VerifyTokenView,
 )
@@ -69,5 +70,11 @@ urlpatterns = [
         "profile/delete/",
         DeleteAccountView.as_view(),
         name="delete-account",
+    ),
+    # Dashboard
+    path(
+        "dashboard/",
+        StudentDashboardView.as_view(),
+        name="student-dashboard",
     ),
 ]
